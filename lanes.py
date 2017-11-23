@@ -106,7 +106,7 @@ class LaneFinder():
         self.undistorter = undistorter
         self.warper = warper
 
-    def find(self, image, x0=None, display=False):
+    def find(self, image, x0=None, display=False, ym_per_pix=30 / 720, xm_per_pix=3.7 / 700, showStats=True):
         # Create the masked image
         undistorted = self.undistorter.undistort(image)
         warped = self.warper.warp(undistorted)
@@ -156,13 +156,41 @@ class LaneFinder():
         unwarped = self.warper.unwarp(lanes)
         overlayed = cv2.addWeighted(unwarped, .8, undistorted, 1, 0, numpy.zeros_like(undistorted))
 
+        # Now, if desired, show the statistics
+        if showStats:
+            offCenter = xm_per_pix * ((leftLane[-1] + rightLane[-1]) / 2 - width / 2)
+            text = 'Vehicle is ' + '{:.2f}'.format(abs(offCenter)) + 'm '
+            if offCenter < 0:
+                text += 'left '
+            else:
+                text += 'right'
+            text += ' of center'
+            fontFace = cv2.FONT_HERSHEY_SIMPLEX
+            fontScale = 2
+            thickness = 2
+            textSize = cv2.getTextSize(text, fontFace, fontScale, thickness)
+            x = int((width - textSize[0][0]) / 2)
+            y = 2 * textSize[0][1]
+            cv2.putText(overlayed, text, (x, y), fontFace, fontScale, (255, 255, 255), thickness=thickness)
+
+            alpha = ym_per_pix
+            beta = xm_per_pix
+            A = leftLane[0] * beta**2 / alpha
+            B = leftLane[1] * beta / alpha
+            curvature = ((1 + B ** 2) ** 1.5) / abs(2 * A)
+            text = "Radius of Curvature: " + '{:.0f}'.format(curvature) + 'm '
+            textSize = cv2.getTextSize(text, fontFace, fontScale, thickness)
+            x = int((width - textSize[0][0]) / 2)
+            y = 4 * textSize[0][1]
+            cv2.putText(overlayed, text, (x, y), fontFace, fontScale, (255, 255, 255), thickness=thickness)
+
         if display:
-            fig,ax = plt.subplots(1,2)
+            fig, ax = plt.subplots(1, 2)
             fig.subplots_adjust(hspace=0, wspace=0, bottom=0, left=0, top=1, right=1)
-            fig.set_size_inches(15,7)
-            maskedRGB = numpy.zeros_like( lanes )
+            fig.set_size_inches(15, 7)
+            maskedRGB = numpy.zeros_like(lanes)
             masked = numpy.uint8(255) * masked
-            maskedRGB[:,:,0] = masked
+            maskedRGB[:, :, 0] = masked
             overlayedMasked = cv2.addWeighted(lanes, .8, maskedRGB, 1, 0, numpy.zeros_like(maskedRGB))
             ax[0].imshow(overlayedMasked)
             ax[0].axis("off")
@@ -181,10 +209,10 @@ def findLanesinVideo(inputPath, outputPath):
 
 
 if __name__ == "__main__":
-    if False:
-        file = 'aaa/frame1.jpg'
+    if True:
+        file = 'project_video/frame957.jpg'
         image = cv2.cvtColor(cv2.imread(file), cv2.COLOR_BGR2RGB)
-        LaneFinder().find(image, display=True)
+        LaneFinder().find(image, display=True, showStats=True)
     else:
         srcDir = "test_videos"
         dstDir = "output_videos"
